@@ -466,6 +466,22 @@ h1 mark .w>span{animation-delay:calc(var(--d)*75ms + .05s)}
 .eyebrow{animation:eyeIn .6s cubic-bezier(.2,.8,.2,1) backwards}
 @keyframes eyeIn{from{opacity:0;transform:translateX(-14px);letter-spacing:.3em}}
 @media(prefers-reduced-motion:reduce){.w>span,h1 mark,.eyebrow{animation:none}}
+/* la primera burbuja heredaba el estilo del encabezado (.top) y su numero quedaba arriba */
+.bub.top{display:flex;flex-wrap:nowrap;flex-direction:column;align-items:center;justify-content:center;gap:0;margin:0}
+h1 mark{vertical-align:bottom;padding-top:.03em;padding-bottom:.03em}
+/* tarjetas: sin punto de color, titulo mas grande y en verde oscuro */
+.kpi .lbl{font-size:14px;letter-spacing:.05em;color:var(--ink);line-height:1.25}
+.dd #ymApply{margin-top:8px}
+.dd .err:empty{min-height:0;margin:0}
+/* "Sigue bajando": pastilla amarilla que flota, con flechas que caen */
+.cue{display:inline-flex;align-items:center;gap:10px;margin-top:30px;padding:12px 20px 12px 22px;border-radius:999px;background:var(--yel,#FFC807);color:#04452D;font-size:15px;font-weight:700;letter-spacing:.02em;box-shadow:0 8px 22px -8px rgba(255,200,7,.7);animation:cueBob 1.6s ease-in-out infinite}
+.cue .cd{flex:none;animation:cueArrow 1.6s ease-in-out infinite}
+.cue::before{content:"";position:absolute;inset:0;border-radius:inherit;box-shadow:0 0 0 0 rgba(255,200,7,.55);animation:cuePulse 1.6s ease-out infinite;pointer-events:none}
+.cue{position:relative}
+@keyframes cueBob{0%,100%{transform:translateY(0)}50%{transform:translateY(7px)}}
+@keyframes cueArrow{0%,100%{transform:translateY(-2px);opacity:.55}50%{transform:translateY(4px);opacity:1}}
+@keyframes cuePulse{0%{box-shadow:0 0 0 0 rgba(255,200,7,.55)}100%{box-shadow:0 0 0 18px rgba(255,200,7,0)}}
+@media(prefers-reduced-motion:reduce){.cue,.cue .cd,.cue::before{animation:none}}
 </style>
 <div id="splash" aria-label="Cargando el tablero"></div>
 <div class="prog" id="prog" hidden aria-hidden="true"><span id="progb"></span></div>
@@ -489,7 +505,7 @@ h1 mark .w>span{animation-delay:calc(var(--d)*75ms + .05s)}
         <p class="cmp" id="cmp"></p>
         <div class="tools"><button class="tb" id="ddb" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4M3 10h18"/></svg><span id="ddt">Últimos 28 días</span><small id="dds"></small></button><div class="dd" id="dd" hidden role="dialog" aria-label="Filtro de fechas">
           <div class="dd-sec"><h4>Atajos</h4><div class="chips" id="chips"></div></div>
-          <div class="dd-sec"><h4>Año y mes</h4><div class="two"><label>Año<select id="selY"></select></label><label>Mes<select id="selM"></select></label></div></div>
+          <div class="dd-sec"><h4>Año y mes</h4><div class="two"><label>Año<select id="selY"></select></label><label>Mes<select id="selM"></select></label></div><p class="err" id="ddErr2"></p><button class="apply" id="ymApply">Aplicar año y mes</button></div>
           <div class="dd-sec"><h4>Rango personalizado</h4><div class="two"><label>Desde<input type="date" id="dFrom"></label><label>Hasta<input type="date" id="dTo"></label></div><p class="err" id="ddErr"></p><button class="apply" id="dApply">Aplicar rango</button></div>
         </div></div>
       </div>
@@ -617,14 +633,15 @@ let RAW=null,LIVE=false,START=new Date(2026,0,1),TODAY=new Date(),N=1;
 const pd=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
 const dateAt=i=>{const d=new Date(START);d.setDate(d.getDate()+i);return d};
 const idxOf=d=>Math.round((new Date(d.getFullYear(),d.getMonth(),d.getDate())-START)/864e5);
-function load(raw){RAW=raw;
+let LI_OLD=false;
+function load(raw){RAW=raw;LI_OLD=!!(raw.empresa&&raw.empresa.length&&!('clics' in raw.empresa[0]));
   const rows={ig:raw.instagram||[],li:raw.empresa||[],ana:raw.ana||[],pab:raw.pablo||[],yt:raw.youtube||[],sp:raw.spotify||[]};
   const all=[...Object.values(rows).flat().map(r=>r.d),...(raw.quiz||[]).map(r=>r.d),...(raw.leads||[]).map(r=>r.d)].filter(Boolean).sort();
   const now=new Date(),rt=new Date(now.getFullYear(),now.getMonth(),now.getDate()),mx=all.length?pd(all[all.length-1]):rt,mn=all.length?pd(all[0]):rt;
   TODAY=mx>rt?mx:rt;START=new Date(Math.min(mn.getFullYear(),TODAY.getFullYear()),0,1);N=Math.round((TODAY-START)/864e5)+1;
   const ix=s=>Math.round((pd(s)-START)/864e5);
   P.ig=rows.ig.map(r=>({i:ix(r.d),t:r.t||'Otro',title:r.title||'Publicación',url:r.url,m:r.reach||0,views:r.views||0,likes:r.likes||0,comments:r.comments||0,shares:r.shares||0,saves:r.saves||0,follows:r.follows||0,dur:r.dur||0,er:r.er,sr:r.sr,shr:r.shr,ra:r.ra,inter:(r.likes||0)+(r.comments||0)+(r.shares||0)+(r.saves||0)}));
-  ['li','ana','pab'].forEach(k=>P[k]=rows[k].map(r=>({i:ix(r.d),t:r.t||null,title:r.title||'Publicación',url:r.url,m:r.imp||0,inter:r.int==null?null:r.int,views:r.views,clics:r.clics,ctr:r.ctr,rec:r.rec,com:r.com,sh:r.sh,fol:r.fol,er:r.er,tp:r.tp,camp:r.camp})));
+  ['li','ana','pab'].forEach(k=>P[k]=rows[k].map(r=>({i:ix(r.d),t:r.t||null,title:r.title||'Publicación',url:r.url,m:r.imp||0,inter:r.int==null?null:r.int,views:r.views,clics:r.clics,ctr:r.ctr,rec:r.rec,com:r.com,sh:r.sh,er:r.er,tp:r.tp,camp:r.camp})));
   P.yt=rows.yt.map(r=>({i:ix(r.d),t:r.t||'Video',title:r.title,url:r.url,m:r.views||0,com:r.com||0,ctr:r.ctr==null?null:r.ctr,avg:r.avg==null?null:r.avg,inter:null}));
   P.sp=rows.sp.map(r=>({i:ix(r.d),t:'Episodio',title:r.title,url:r.url,m:r.plays||0,aud:r.aud||0,imp:r.imp||0,time:r.time||0,dur:r.dur==null?null:r.dur,inter:null}));
   LD.landing=(raw.leads||[]).map(r=>({...r,i:ix(r.d)}));LD.quiz=(raw.quiz||[]).map(r=>({...r,i:ix(r.d)}));
@@ -776,7 +793,7 @@ const HEAD={
 function kpiCard(i,{l,color,val,fmtK,suf='',dec,d,dpp,vals,sub,how,warn}){const c=el('div','card kpi rise');c.style.setProperty('--i',i);
   const v=val==null?'<div class="v">n/d</div>':`<div class="v" data-count="${val}" ${fmtK?'data-f="k"':''} ${dec?'data-dec="1"':''} data-suf="${suf}">${dec?dec1(val):fmt(val)}${suf}</div>`;
   const chip=dpp!==undefined?deltaChip(dpp,'pp'):deltaChip(d),noPrev=dpp!==undefined?dpp==null:d==null;
-  c.innerHTML=`<div class="lbl">${color?`<i class="sw" style="background:${color}"></i>`:''}${l}</div><div class="row">${v}${vals?spark(vals,color||'var(--lime)'):''}</div><div>${val==null?'':chip} ${sub===null||(noPrev&&!sub)?'':`<small>${sub||'vs. periodo anterior'}</small>`}</div>${how?`<p class="how">${how}</p>`:''}${warn?`<p class="how wn">${warn}</p>`:''}`;return c}
+  c.innerHTML=`<div class="lbl">${l}</div><div class="row">${v}${vals?spark(vals,color||'var(--lime)'):''}</div><div>${val==null?'':chip} ${sub===null||(noPrev&&!sub)?'':`<small>${sub||'vs. periodo anterior'}</small>`}</div>${how?`<p class="how">${how}</p>`:''}${warn?`<p class="how wn">${warn}</p>`:''}`;return c}
 function card(cls,title,sub,i=0,one=false){const c=el('section','card '+cls+' rise');c.style.setProperty('--i',i);c.innerHTML=(title?`<h3>${title}</h3>`:'')+(sub?`<p class="sub${one?' one':''}">${sub}</p>`:'');return c}
 function insightCard(k,t,p,i=0){const c=el('section','ins c12 rise');c.style.setProperty('--i',i);c.innerHTML=`<div class="k">${k}</div><h3>${t}</h3><p>${p}</p>`;return c}
 /* reparte las tarjetas en filas iguales o casi iguales, y cada una se estira para llenar el ancho */
@@ -816,7 +833,7 @@ function vResumen(g){
   c1.style.setProperty('--i',0);g.append(c1);
   kgrid(g,[
    kpiCard(1,{l:'Piezas publicadas',val:T.pubs.cur,d:dl(T.pubs.cur,T.pubs.prv),color:'var(--yt)',sub:'entre todas las redes',vals:BK.out.map(b=>sum(KEYS.map(k=>P[k].filter(p=>p.i>=b.s&&p.i<=b.e).length)))}),
-   kpiCard(2,{l:'Interacciones',val:T.inter.cur,fmtK:1,d:dl(T.inter.cur,T.inter.prv),color:'var(--yt)',how:'Suma de Instagram (me gusta + comentarios + compartidos + guardados), LinkedIn empresa (clics + reacciones + comentarios + veces compartido + seguidores) y la columna Interacciones de Ana y Pablo. YouTube y Spotify no entregan interacciones comparables.'}),
+   kpiCard(2,{l:'Interacciones',val:T.inter.cur,fmtK:1,d:dl(T.inter.cur,T.inter.prv),color:'var(--yt)',how:'Suma de Instagram (me gusta + comentarios + compartidos + guardados), LinkedIn empresa (clics + reacciones + comentarios + veces compartido) y la columna Interacciones de Ana y Pablo. YouTube y Spotify no entregan interacciones comparables.'}),
    kpiCard(3,{l:'Leads captados',val:T.leads.cur,d:dl(T.leads.cur,T.leads.prv),color:'var(--lime)',sub:'landing + cuestionario',vals:bcount(LD.landing.concat(LD.quiz)),how:'Registros de la landing nueva más respuestas del cuestionario.'}),
    kpiCard(4,{l:'Tasa de interacción',val:T.rate.cur==null?null:+T.rate.cur.toFixed(1),suf:' %',dec:1,dpp:(T.rate.cur!=null&&T.rate.prv!=null)?T.rate.cur-T.rate.prv:null,color:'var(--yt)',how:'Calculada: interacciones totales ÷ (alcance de Instagram + impresiones de LinkedIn). Solo entran las publicaciones con dato de interacciones.'})]);
   const rows=KEYS.map(k=>{const a=A(k,p=>p.m),n=postsR(k).length,s=isR(k);return{k,a,n,avg:n?a.cur/n:0,rate:s.rate,has:P[k].length>0}});
@@ -845,22 +862,23 @@ function vSocial(g,key){
     cs.push(kpi(2,key,{l:'Visualizaciones',f:p=>p.views||0,how:'Suma de la columna Visualizaciones.'}),ck('clics','Clics','Suma de la columna Clics.'));
     const cl=S1(postsR('li'),p=>p.clics||0),clp=HAS_PREV?S1(postsP('li'),p=>p.clics||0):null,im=sr.base,imp=sp?sp.base:null;
     cs.push(kpiCard(cs.length,{l:'Porcentaje de clics',color:`var(${NET.li.v})`,val:im?+(cl/im*100).toFixed(1):null,suf:' %',dec:1,dpp:(im&&imp)?cl/im*100-clp/imp*100:null,how:'Calculado: Clics ÷ Impresiones del periodo. La hoja trae el de cada publicación.'}),
-      ck('rec','Reacciones','Suma de la columna Reacciones (incluye todas las reacciones, no solo las recomendaciones).'),ck('com','Comentarios','Suma de la columna Comentarios.'),ck('sh','Veces compartido','Suma de la columna Veces compartido.'),ck('fol','Seguidores','Suma de la columna Seguidores: seguidores ganados desde las publicaciones.'),
-      kpiCard(cs.length+4,{l:'Interacciones',color:`var(${NET.li.v})`,val:sr.inter,fmtK:1,d:dl(sr.inter,sp?sp.inter:null),vals:bval('li',p=>p.inter||0),how:'Suma de clics + reacciones + comentarios + veces compartido + seguidores de cada publicación.'}),
-      kpiCard(cs.length+5,{l:'Tasa de interacción',color:`var(${NET.li.v})`,val:sr.rate==null?null:+sr.rate.toFixed(1),suf:' %',dec:1,dpp:(sr.rate!=null&&sp&&sp.rate!=null)?sr.rate-sp.rate:null,how:'Calculada: (clics + reacciones + comentarios + veces compartido + seguidores) ÷ Impresiones del periodo.'}))}
+      ck('rec','Reacciones','Suma de la columna Reacciones (incluye todas las reacciones, no solo las recomendaciones).'),ck('com','Comentarios','Suma de la columna Comentarios.'),ck('sh','Veces compartido','Suma de la columna Veces compartido.'),
+      kpiCard(cs.length+4,{l:'Interacciones',color:`var(${NET.li.v})`,val:sr.inter,fmtK:1,d:dl(sr.inter,sp?sp.inter:null),vals:bval('li',p=>p.inter||0),how:'Suma de clics + reacciones + comentarios + veces compartido de cada publicación.'}),
+      kpiCard(cs.length+5,{l:'Tasa de interacción',color:`var(${NET.li.v})`,val:sr.rate==null?null:+sr.rate.toFixed(1),suf:' %',dec:1,dpp:(sr.rate!=null&&sp&&sp.rate!=null)?sr.rate-sp.rate:null,how:'Calculada: (clics + reacciones + comentarios + veces compartido) ÷ Impresiones del periodo.'}))}
   kgrid(g,cs);
   const m1=card('c12',`${mainL} y Visualizaciones de cada publicación`,'Cada punto es una publicación, ubicada en su fecha de publicación.',9,true);
   m1.insertAdjacentHTML('beforeend',legend([{name:mainL,color:hex(key)},{name:'Visualizaciones',color:cv('--l1')}]));
   m1.insertAdjacentHTML('beforeend','<div class="chart" id="ch-a"></div>');g.append(m1);
+  if(!isIG&&LI_OLD){const w=el('div','ph c12 rise');w.style.gridColumn='span 12';w.innerHTML='<b>Falta actualizar el puente de Apps Script.</b> Los datos de LinkedIn llegan sin Visualizaciones, Clics, Reacciones ni Comentarios porque la implementación de Apps Script todavía usa la versión anterior de Code.gs. Pega el Code.gs nuevo y crea una Nueva versión en Implementar > Administrar implementaciones.';g.insertBefore(w,g.firstChild)}
   const bf=bestFormat(key);let fb;
-  if(bf.arr.length){const f=card('c12','Rendimiento por formato',`Promedio calculado de la columna ${mainL} para cada ${isIG?'Tipo de publicación':'Tipo de contenido'}. El tamaño de la burbuja es proporcional a ese promedio. El indicador compara con el promedio calculado de todas las publicaciones (${fk(bf.all)}).`,11,false);fb=el('div');f.append(fb);g.append(f)}
+  if(bf.arr.length>1){const f=card('c12','Rendimiento por formato',`Promedio calculado de la columna ${mainL} para cada ${isIG?'Tipo de publicación':'Tipo de contenido'}. El tamaño de la burbuja es proporcional a ese promedio. El indicador compara con el promedio calculado de todas las publicaciones (${fk(bf.all)}).`,11,false);fb=el('div');f.append(fb);g.append(f)}
   let tb;
   if(isIG){const rows=postsR('ig').slice().sort((a,b)=>b.m-a.m).slice(0,10),mx=Math.max(1,...rows.map(r=>r.m));
     tb=card('c12','Publicaciones del periodo',`Valores de cada publicación, tal como vienen en la hoja. Las ${rows.length} con más Alcance.`,12,true);
     tb.insertAdjacentHTML('beforeend',rows.length?tblHTML([{h:'Descripción',cl:'ttl',f:titleCell},{h:'Tipo de publicación',f:r=>`<span class="tag">${esc(r.t)}</span>`},{h:'Fecha publicación',n:1,f:dateCell},{h:'Alcance',f:r=>barCell(r,'ig',mx)},{h:'Visualizaciones',n:1,f:r=>fmt(r.views)},{h:'Me gusta',n:1,f:r=>fmt(r.likes)},{h:'Comentarios',n:1,f:r=>fmt(r.comments)},{h:'Veces que se compartió',n:1,f:r=>fmt(r.shares)},{h:'Veces que se guardó',n:1,f:r=>fmt(r.saves)},{h:'Seguimientos',n:1,f:r=>fmt(r.follows)},{h:'Engagement rate',n:1,f:r=>pct1(r.er)},{h:'Tasa de guardado',n:1,f:r=>pct1(r.sr)},{h:'Tasa de compartidos',n:1,f:r=>pct1(r.shr)},{h:'Razón alcance/ visualizaciones',n:1,f:r=>r.ra==null?'<span class="mute">n/d</span>':dec1(r.ra)},{h:'Enlace permanente',n:1,f:r=>linkCell(r,'ig')}],rows):'<p class="sub">No hay publicaciones en este periodo.</p>');g.append(tb)}
   else{const rows=postsR('li').slice().sort((a,b)=>b.m-a.m).slice(0,10),mx=Math.max(1,...rows.map(r=>r.m)),nd='<span class="mute">n/d</span>',nn=v=>v==null?nd:fmt(v);
     tb=card('c12','Publicaciones del periodo',`Valores de cada publicación, tal como vienen en la hoja. Las ${rows.length} con más Impresiones.`,12,true);
-    tb.insertAdjacentHTML('beforeend',rows.length?tblHTML([{h:'Título de la publicación',cl:'ttl',f:titleCell},{h:'Tipo de publicación',f:r=>r.tp?`<span class="tag">${esc(r.tp)}</span>`:nd},{h:'Tipo de contenido',f:r=>r.t?`<span class="tag">${esc(r.t)}</span>`:nd},{h:'Fecha de creación',n:1,f:dateCell},{h:'Impresiones',f:r=>barCell(r,key,mx)},{h:'Visualizaciones',n:1,f:r=>nn(r.views)},{h:'Clics',n:1,f:r=>nn(r.clics)},{h:'Porcentaje de clics',n:1,f:r=>pct1(r.ctr)},{h:'Reacciones',n:1,f:r=>nn(r.rec)},{h:'Comentarios',n:1,f:r=>nn(r.com)},{h:'Veces compartido',n:1,f:r=>nn(r.sh)},{h:'Seguidores',n:1,f:r=>nn(r.fol)},{h:'Tasa de interacción',n:1,f:r=>pct1(r.er)},{h:'Enlace',n:1,f:r=>linkCell(r,key)}],rows):'<p class="sub">No hay publicaciones en este periodo.</p>');g.append(tb)}
+    tb.insertAdjacentHTML('beforeend',rows.length?tblHTML([{h:'Título de la publicación',cl:'ttl',f:titleCell},{h:'Tipo de publicación',f:r=>r.tp?`<span class="tag">${esc(r.tp)}</span>`:nd},{h:'Tipo de contenido',f:r=>r.t?`<span class="tag">${esc(r.t)}</span>`:nd},{h:'Fecha de creación',n:1,f:dateCell},{h:'Impresiones',f:r=>barCell(r,key,mx)},{h:'Visualizaciones',n:1,f:r=>nn(r.views)},{h:'Clics',n:1,f:r=>nn(r.clics)},{h:'Porcentaje de clics',n:1,f:r=>pct1(r.ctr)},{h:'Reacciones',n:1,f:r=>nn(r.rec)},{h:'Comentarios',n:1,f:r=>nn(r.com)},{h:'Veces compartido',n:1,f:r=>nn(r.sh)},{h:'Tasa de interacción',n:1,f:r=>pct1(r.er)},{h:'Enlace',n:1,f:r=>linkCell(r,key)}],rows):'<p class="sub">No hay publicaciones en este periodo.</p>');g.append(tb)}
   g._after=()=>{const pts=m=>lp(postsR(key),m);
     tline($('#ch-a'),{series:[{name:mainL,color:hex(key),pts:pts(p=>p.m)},{name:'Visualizaciones',color:cv('--l1'),pts:pts(p=>p.views||0)}]});
     if(fb)bubbles(fb,key,bf);animateFills(tb)};
@@ -955,7 +973,7 @@ function find({c,num,dec,k,suf,lab,h,p,viz}){const v=`<span data-count="${num}" 
 function vInsights(g){
   g.className='story';
   const T=totals(),ig=bestFormat('ig'),yt=bestFormat('yt'),landing=LR(LD.landing),quiz=LR(LD.quiz),leads=landing.concat(quiz),bySrc=countBy(leads,r=>r.src||'');
-  const hero=el('section','s-hero');hero.innerHTML=`<div class="hh"><h2 class="r">Del dato a <b>la decisión</b></h2><p class="r" style="--dl:.1s">Fortalezas del periodo, oportunidades de mejora y decisiones propuestas. Todo se recalcula con el rango de fechas elegido arriba.</p><div class="cue r" style="--dl:.5s"><i></i>Sigue bajando</div></div><div class="s-kpis">`+
+  const hero=el('section','s-hero');hero.innerHTML=`<div class="hh"><h2 class="r">Del dato a <b>la decisión</b></h2><p class="r" style="--dl:.1s">Fortalezas del periodo, oportunidades de mejora y decisiones propuestas. Todo se recalcula con el rango de fechas elegido arriba.</p><div class="cue r" style="--dl:.5s"><span>Sigue bajando</span><svg class="cd" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 5l6 6 6-6"/><path d="M6 12l6 6 6-6"/></svg></div></div><div class="s-kpis">`+
    [[fk(T.reach.cur),'de alcance acumulado',T.reach.cur,'k'],[String(T.pubs.cur),'piezas publicadas',T.pubs.cur],[String(T.leads.cur),'leads captados',T.leads.cur]].map((x,i)=>`<div class="card r" style="--dl:${.15+i*.12}s"><div class="lbl">${x[1]}</div><div class="vv" data-count="${x[2]}" ${x[3]?'data-f="k"':''}>${x[0]}</div></div>`).join('')+`</div>`;
   g.append(hero);
   /* capítulo 1: fortalezas */
@@ -1092,15 +1110,15 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(!ro
 const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 const dd=$('#dd'),ddb=$('#ddb');
 const monthRange=(y,m)=>[Math.max(0,idxOf(new Date(y,m,1))),Math.min(N-1,idxOf(new Date(y,m+1,0)))];
-const PRESETS=[['7d','Últimos 7 días',()=>[N-7,N-1]],['28d','Últimos 28 días',()=>[N-28,N-1]],['90d','Últimos 90 días',()=>[N-90,N-1]],['6m','Últimos 6 meses',()=>[Math.max(0,idxOf(new Date(TODAY.getFullYear(),TODAY.getMonth()-6,TODAY.getDate()))),N-1]],['mes','Este mes',()=>[idxOf(new Date(TODAY.getFullYear(),TODAY.getMonth(),1)),N-1]],['mesant','Mes anterior',()=>{const d=new Date(TODAY.getFullYear(),TODAY.getMonth()-1,1);return monthRange(d.getFullYear(),d.getMonth())}],['anio','Este año',()=>[idxOf(new Date(TODAY.getFullYear(),0,1)),N-1]],['anioant','Año anterior',()=>[idxOf(new Date(TODAY.getFullYear()-1,0,1)),idxOf(new Date(TODAY.getFullYear()-1,11,31))]]];
+const PRESETS=[['7d','Últimos 7 días',()=>[N-7,N-1]],['28d','Últimos 28 días',()=>[N-28,N-1]],['1m','Último mes',()=>[Math.max(0,idxOf(new Date(TODAY.getFullYear(),TODAY.getMonth()-1,TODAY.getDate()))),N-1]],['90d','Últimos 90 días',()=>[N-90,N-1]],['6m','Últimos 6 meses',()=>[Math.max(0,idxOf(new Date(TODAY.getFullYear(),TODAY.getMonth()-6,TODAY.getDate()))),N-1]],['mes','Este mes',()=>[idxOf(new Date(TODAY.getFullYear(),TODAY.getMonth(),1)),N-1]],['mesant','Mes anterior',()=>{const d=new Date(TODAY.getFullYear(),TODAY.getMonth()-1,1);return monthRange(d.getFullYear(),d.getMonth())}],['anio','Este año',()=>[idxOf(new Date(TODAY.getFullYear(),0,1)),N-1]],['anioant','Año anterior',()=>[idxOf(new Date(TODAY.getFullYear()-1,0,1)),idxOf(new Date(TODAY.getFullYear()-1,11,31))]]];
 function apply(s,e,label,key){setRange(s,e,label,key);syncDD();render()}
-function syncDD(){$('#chips').querySelectorAll('.chip').forEach(c=>c.setAttribute('aria-pressed',c.dataset.k===RSEL.key));$('#dFrom').value=iso(S);$('#dTo').value=iso(E)}
+function syncDD(){$('#chips').querySelectorAll('.chip').forEach(c=>c.setAttribute('aria-pressed',c.dataset.k===RSEL.key));$('#dFrom').value=iso(S);$('#dTo').value=iso(E);if(RSEL.key!=='ym'){$('#selY').value='';$('#selM').value=''}$('#ddErr').textContent='';$('#ddErr2').textContent=''}
 const iso=i=>{const d=dateAt(i);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
-$('#chips').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;const p=PRESETS.find(x=>x[0]===b.dataset.k),r=p[2]();if(r[1]<r[0]||r[1]<0){$('#ddErr').textContent='Ese periodo no tiene datos.';return}apply(r[0],r[1],p[1],p[0]);closeDD()});
-function ym(close){const y=$('#selY').value,m=$('#selM').value;if(!y)return;const Y=+y;let r,lab;if(m===''){r=[Math.max(0,idxOf(new Date(Y,0,1))),Math.min(N-1,idxOf(new Date(Y,11,31)))];lab=String(Y)}else{r=monthRange(Y,+m);lab=MESES[+m]+' '+Y;if(r[0]>N-1||r[1]<r[0]){$('#ddErr').textContent='Ese mes todavía no tiene datos.';return}}
-  if(r[1]-r[0]+1<7){$('#ddErr').textContent='El periodo mínimo es de 7 días. Elige un mes completo o un rango personalizado.';return}
-  $('#ddErr').textContent='';apply(r[0],r[1],lab,'ym');if(close)closeDD()}
-$('#selY').addEventListener('change',()=>ym(false));$('#selM').addEventListener('change',()=>ym(true));
+$('#chips').addEventListener('click',e=>{const b=e.target.closest('.chip');if(!b)return;const k=b.dataset.k;if(RSEL.key===k){if(k==='1m')return;setDefaultRange();syncDD();render();closeDD();return}const p=PRESETS.find(x=>x[0]===k),r=p[2]();if(r[1]<r[0]||r[1]<0){$('#ddErr').textContent='Ese periodo no tiene datos.';return}apply(r[0],r[1],p[1],p[0]);closeDD()});
+function ym(close){const y=$('#selY').value,m=$('#selM').value;if(!y){$('#ddErr2').textContent='Elige un año.';return}const Y=+y;let r,lab;if(m===''){r=[Math.max(0,idxOf(new Date(Y,0,1))),Math.min(N-1,idxOf(new Date(Y,11,31)))];lab=String(Y)}else{r=monthRange(Y,+m);lab=MESES[+m]+' '+Y;if(r[0]>N-1||r[1]<r[0]){$('#ddErr2').textContent='Ese mes todavía no tiene datos.';return}}
+  if(r[1]-r[0]+1<7){$('#ddErr2').textContent='El periodo mínimo es de 7 días. Elige un mes completo o un rango personalizado.';return}
+  $('#ddErr2').textContent='';apply(r[0],r[1],lab,'ym');if(close)closeDD()}
+$('#ymApply').addEventListener('click',()=>ym(true));['#selY','#selM'].forEach(s=>$(s).addEventListener('change',()=>{$('#ddErr2').textContent=''}));
 $('#dApply').addEventListener('click',()=>{const f=$('#dFrom').valueAsDate,t=$('#dTo').valueAsDate,er=$('#ddErr');
   if(!f||!t){er.textContent='Elige las dos fechas.';return}const a=idxOf(new Date(f.getUTCFullYear(),f.getUTCMonth(),f.getUTCDate())),b=idxOf(new Date(t.getUTCFullYear(),t.getUTCMonth(),t.getUTCDate()));
   if(b<a){er.textContent='La fecha final debe ser posterior a la inicial.';return}if(b-a+1<7){er.textContent='El periodo mínimo es de 7 días.';return}
@@ -1145,7 +1163,8 @@ function initUI(){
   const y0=START.getFullYear(),y1=TODAY.getFullYear();$('#selY').innerHTML='<option value="">Elegir</option>'+Array.from({length:y1-y0+1},(_,i)=>`<option value="${y0+i}">${y0+i}</option>`).join('');
   $('#selM').innerHTML='<option value="">Todo el año</option>'+MESES.map((m,i)=>`<option value="${i}">${m[0].toUpperCase()+m.slice(1)}</option>`).join('');
   $('#dFrom').min=$('#dTo').min=iso(0);$('#dFrom').max=$('#dTo').max=iso(N-1);fxScan()}
-function start(raw){load(raw);initUI();{const p6=PRESETS.find(x=>x[0]==='6m'),r6=p6[2]();setRange(r6[0],r6[1],p6[1],'6m')}syncDD();READY=true;route()}
+function setDefaultRange(){const p=PRESETS.find(x=>x[0]==='1m'),r=p[2]();setRange(r[0],r[1],p[1],'1m')}
+function start(raw){load(raw);initUI();setDefaultRange();syncDD();READY=true;route()}
 function showErr(e){READY=false;view.innerHTML=`<div class="card" style="padding:28px"><h3>No se pudieron leer los datos del Google Sheet</h3><p class="sub">${esc(e&&e.message||e)}</p><p style="color:var(--ink2);font-size:13.5px;margin:0 0 16px">Revisa que la aplicación web de Apps Script esté publicada con acceso para cualquier persona y que la URL de DATA_URL termine en /exec.</p><button class="apply" style="width:auto;padding:10px 20px" onclick="boot()">Reintentar</button></div>`}
 /* actualizar sin recargar la pagina: mantiene la pantalla y el rango de fechas */
 async function refresh(){const b=$('#rl');if(!READY||b.getAttribute('aria-busy')==='true')return;b.setAttribute('aria-busy','true');
